@@ -1,0 +1,450 @@
+---
+title: "Support Vector Machine"
+author: "Chandan Gowda Ashwath"
+date: "9/9/2020"
+output: pdf_document
+---
+
+1. Introduction:
+
+This assignment will look at a data “juice.csv” which contains purchase information for Citrus Hill or Minute Maid orange juice. 
+
+This assignment is interested in predicting whether the customer purchased Citrus Hill or Minute Maid Orange Juice. Support Vector Machines will be used for this prediction.
+
+We will be using three kernels i.e., linear, radial, and polynomial.
+
+2. Data and Analysis: 
+
+Let us load the data and perform some exploratory analysis.
+
+```{r}
+if(!require("pacman")) 
+install.packages("pacman")
+pacman::p_load(e1071, ggplot2, caret, rmarkdown, corrplot, knitr)
+search()
+theme_set(theme_classic())
+options(digits = 3)
+data<-read.csv("juice.csv")
+```
+
+Let us take a look at the summary and Structure of the "JUICES" data.
+
+From the summary function, we can see that some of the variables have 5 number summaries in the form of "Min, 1st Qu, Median, Mean, 3rd Qu, Max", when these variables should be more categorical in nature. These are not so meaningful for categorical variables. 
+
+StoreID, SpecialCH, SpecialMM and Store are examples of the categorical variables with summaries.
+
+```{r}
+summary(data)
+str(data)
+```
+
+So, let us first convert these variables to categories.
+
+From the summary data,
+There are three store variables i.e, StoreID, Store7 and STORE and all these variables are related. StoreID and STORE contains same number of observations except for store 7 values converted as 0.
+
+Also, the SpecialCH and SpecialMM show that most purchases did not include a special value on either juice brand.
+
+```{r}
+data1<-data
+cvar = c("StoreID","SpecialCH","SpecialMM","STORE") 
+data1[cvar] = lapply(data1[cvar], as.factor)
+summary(data1)
+str(data1)
+```
+
+Let us see the correlation among the numerical variables
+
+One can see almost perfect correlation of arround 0.99 between two pairs of variables i.e., PctDiscMM and DiscMM, and PctDiscCH and DiscCH. The two pairs of variables show almost a straight line. These two pairs also have an overall correlation value of around 0.99.
+
+There are also a couple of other highly correlated pairs with > 0.8 in magnitude as well, such as PctDicMM and PriceDiff. These show a general linear trend between the two variables that is easy to distinguish.
+
+```{r}
+data2 <- data1[, -c(1, 3, 8, 9, 14, 18)]
+cor(data2)
+corrplot(cor(data2), method = "color", type = "upper", tl.srt = 90)
+```
+
+3. Data Partition
+
+```{r}
+set.seed(123)
+trainindex <- createDataPartition(data1$Purchase, p=0.8, list= FALSE)
+juice_train <- data1[trainindex, ]
+juice_test <- data1[-trainindex, ]
+dim(juice_train)
+dim(juice_test)
+```
+
+4. SVM Model
+  a. Kernel = Linear
+     1. Cost = 0.01 (default)
+  
+```{r}
+svm1 <- svm(Purchase~., data=juice_train, kernel = "linear", cost=0.01)
+summary(svm1)
+```
+
+     Training error rate:
+
+```{r}
+train.pred = predict(svm1, juice_train)
+x<-table(juice_train$Purchase, train.pred)
+x
+```
+
+```{r}
+a.linear<-(x[2] + x[3])/(x[1] + x[2] + x[3] + x[4])
+a.linear
+```
+
+     Test error rate:
+
+```{r}
+test.pred = predict(svm1, juice_test)
+x<-table(juice_test$Purchase, test.pred)
+x
+```
+
+```{r}
+b.linear<-(x[2] + x[3])/(x[1] + x[2] + x[3] + x[4])
+b.linear
+```
+     
+     The training error rate is:
+     
+```{r}
+a.linear<-a.linear*100
+capture.output(cat(a.linear, '%'))
+```
+     
+     The test error rate is:
+
+```{r}
+b.linear<-b.linear*100
+capture.output(cat(b.linear, '%'))
+```
+     
+     Tuning to select the best cost parameter
+     
+```{r}
+set.seed(123)
+tune.out = tune(svm, Purchase ~ ., data = juice_train, kernel = "linear", ranges = list(cost = 10^seq(-2, 
+    1, by = 0.25)))
+summary(tune.out)
+```
+
+     Tuning shows that optimal cost is :
+     
+```{r}
+tune.out$best.parameters$cost
+```
+     
+     2. SVM with best cost for kernel = linear
+     
+```{r}
+svm1_bestcost <- svm(Purchase~., data=juice_train, kernel = "linear", cost=tune.out$best.parameters$cost)
+summary(svm1_bestcost)
+```
+
+     Training error rate:
+
+```{r}
+train.pred = predict(svm1_bestcost, juice_train)
+x<-table(juice_train$Purchase, train.pred)
+x
+```
+
+```{r}
+a.linear.best<-(x[2] + x[3])/(x[1] + x[2] + x[3] + x[4])
+a.linear.best
+```
+     
+     Test error rate:
+
+```{r}
+test.pred = predict(svm1_bestcost, juice_test)
+x<-table(juice_test$Purchase, test.pred)
+x
+```
+
+```{r}
+b.linear.best<-(x[2] + x[3])/(x[1] + x[2] + x[3] + x[4])
+b.linear.best
+```
+
+    The training error rate is:
+     
+```{r}
+a.linear.best<-a.linear.best*100
+capture.output(cat(a.linear.best, '%'))
+```
+     
+     The test error rate is:
+
+```{r}
+b.linear.best<-b.linear.best*100
+capture.output(cat(b.linear.best, '%'))
+```
+
+The training error decreases to 16.6% but test error slightly increases from 16.5% to 17% by using best cost.
+
+
+a. Kernel = radial
+  1. Cost = 0.01 (default)
+  
+```{r}
+set.seed(123)
+svm2 <- svm(Purchase~., data=juice_train, kernel = "radial", cost=0.01)
+summary(svm2)
+```
+
+     Training error rate:
+
+```{r}
+train.pred = predict(svm2, juice_train)
+x<-table(juice_train$Purchase, train.pred)
+x
+```
+
+```{r}
+a.radial<-(x[2] + x[3])/(x[1] + x[2] + x[3] + x[4])
+a.radial
+```
+
+     Test error rate:
+
+```{r}
+test.pred = predict(svm2, juice_test)
+x<-table(juice_test$Purchase, test.pred)
+x
+```
+
+```{r}
+b.radial<-(x[2] + x[3])/(x[1] + x[2] + x[3] + x[4])
+b.radial
+```
+     
+     The training error rate is:
+     
+```{r}
+a.radial<-a.radial*100
+capture.output(cat(a.radial, '%'))
+```
+     
+     The test error rate is:
+
+```{r}
+b.radial<-b.radial*100
+capture.output(cat(b.radial, '%'))
+```
+     
+     Tuning to select the best cost parameter
+     
+```{r}
+set.seed(123)
+tune.out = tune(svm, Purchase ~ ., data = juice_train, kernel = "radial", ranges = list(cost = 10^seq(-2, 
+    1, by = 0.25)))
+summary(tune.out)
+```
+
+     Tuning shows that optimal cost is :
+     
+```{r}
+tune.out$best.parameters$cost
+```
+     
+     2. SVM with best cost for kernel = radial
+     
+```{r}
+svm2_bestcost <- svm(Purchase~., data=juice_train, kernel = "radial", cost=tune.out$best.parameters$cost)
+summary(svm2_bestcost)
+```
+
+     Training error rate:
+
+```{r}
+train.pred = predict(svm2_bestcost, juice_train)
+x<-table(juice_train$Purchase, train.pred)
+x
+```
+
+```{r}
+a.radial.best<-(x[2] + x[3])/(x[1] + x[2] + x[3] + x[4])
+a.radial.best
+```
+     
+     Test error rate:
+
+```{r}
+test.pred = predict(svm2_bestcost, juice_test)
+x<-table(juice_test$Purchase, test.pred)
+x
+```
+
+```{r}
+b.radial.best<-(x[2] + x[3])/(x[1] + x[2] + x[3] + x[4])
+b.radial.best
+```
+
+    The training error rate is:
+     
+```{r}
+a.radial.best<-a.radial.best*100
+capture.output(cat(a.radial.best, '%'))
+```
+     
+     The test error rate is:
+
+```{r}
+b.radial.best<-b.radial.best*100
+capture.output(cat(b.radial.best, '%'))
+```
+
+The training error decreases to 16.2% and test error decreases to 15.5% by using best cost.
+
+     a. Kernel = Poly
+     1. Cost = 0.01 (default)
+     
+```{r}
+svm3 <- svm(Purchase~., data=juice_train, kernel = "poly", cost=0.01, degree=2)
+summary(svm3)
+```
+
+     Training error rate:
+
+```{r}
+train.pred = predict(svm3, juice_train)
+x<-table(juice_train$Purchase, train.pred)
+x
+```
+
+```{r}
+a.poly<-(x[2] + x[3])/(x[1] + x[2] + x[3] + x[4])
+a.poly
+```
+
+     Test error rate:
+
+```{r}
+test.pred = predict(svm3, juice_test)
+x<-table(juice_test$Purchase, test.pred)
+x
+```
+
+```{r}
+b.poly<-(x[2] + x[3])/(x[1] + x[2] + x[3] + x[4])
+b.poly
+```
+     
+     The training error rate is:
+     
+```{r}
+a.poly<-a.poly*100
+capture.output(cat(a.poly, '%'))
+```
+     
+     The test error rate is:
+
+```{r}
+b.poly<-b.poly*100
+capture.output(cat(b.poly, '%'))
+```
+     
+     Tuning to select the best cost parameter
+     
+```{r}
+set.seed(123)
+tune.out = tune(svm, Purchase ~ ., data = juice_train, kernel = "poly", degree= 2, ranges = list(cost = 10^seq(-2, 
+    1, by = 0.25)))
+summary(tune.out)
+```
+
+     Tuning shows that optimal cost is :
+     
+```{r}
+tune.out$best.parameters$cost
+```
+     
+     2. SVM with best cost for kernel = poly
+     
+```{r}
+svm3_bestcost <- svm(Purchase~., data=juice_train, kernel = "poly", degree = 2, cost=tune.out$best.parameters$cost)
+summary(svm3_bestcost)
+```
+
+     Training error rate:
+
+```{r}
+train.pred = predict(svm3_bestcost, juice_train)
+x<-table(juice_train$Purchase, train.pred)
+x
+```
+
+```{r}
+a.poly.best<-(x[2] + x[3])/(x[1] + x[2] + x[3] + x[4])
+a.poly.best
+```
+     
+     Test error rate:
+
+```{r}
+test.pred = predict(svm3_bestcost, juice_test)
+x<-table(juice_test$Purchase, test.pred)
+x
+```
+
+```{r}
+b.poly.best<-(x[2] + x[3])/(x[1] + x[2] + x[3] + x[4])
+b.poly.best
+```
+
+    The training error rate is:
+     
+```{r}
+a.poly.best<-a.poly.best*100
+capture.output(cat(a.poly.best, '%'))
+```
+     
+     The test error rate is:
+
+```{r}
+b.poly.best<-b.poly.best*100
+capture.output(cat(b.poly.best, '%'))
+```
+
+The training error decreases to 17.2% and test error decreases from 39% to 17% by using best cost.
+
+```{r}
+rowLabels = c("Linear Kernel, Cost = 0.01",
+              paste("Linear Kernel, with best cost"),
+              "Radial Kernel, Cost = 0.01",
+              paste("Radial Kernel, with best Cost"),
+              "Polynomial Kernel, Degree = 2, Cost = 0.01",
+              paste("Polynomial Kernel, Degree = 2, with best Cost"))
+
+trainingErrorRate = c(a.linear,
+                 a.linear.best,
+                 a.radial,
+                 a.radial.best,
+                 a.poly,
+                 a.poly.best)
+
+testingErrorRate = c(b.linear,
+                 b.linear.best,
+                 b.radial,
+                 b.radial.best,
+                 b.poly,
+                 b.poly.best)
+
+df = data.frame(trainingErrorRate, testingErrorRate, row.names = rowLabels)
+colnames(df) = c("Training Error Rate", "Testing Error Rate")
+kable(df, format = 'markdown')
+```
+
+From the above table, overall, the Radial Kernel with Best Cost parameter of Cost = 0.562 seems to be producing minimum misclassification error on both training and testing data.
+
+Explanation: 
+From the Table, the SVM with a Radial Kernel and a cost of 0.562 seems to give the best results. It had the best train and test error rate compared to the other SVMs. 
+
+Looking at the other information in the table, the Radial and Poly SVMs for default cost = 0.01 had similar results. In other words, the SVM with a radial kernel of deafault cost = 0.01 had similar overall results to the SVM with a polynomial kernel of default cost = 0.01 and it should be noted that the SVMs with radial and polynomial kernels with default cost = 0.01 produced unreliable results without proper classification.
